@@ -5,7 +5,7 @@ models/
 *.h5
 *.keras
 *.weights.h5
-__pycache__/
+pycache/
 *.pyc
 .ipynb_checkpoints/
 .venv/
@@ -15,5 +15,7 @@ venv/
 .env
 kaggle.json
 submission.csv
-*.log
-results/*.png
+.log
+results/.png
+Logs_Checkpoints/
+*.ipynb/
