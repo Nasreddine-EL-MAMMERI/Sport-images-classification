@@ -45,21 +45,36 @@ I switched to **Transfer Learning** with **EfficientNetB0** pre-trained on Image
 
 ### Training Pipeline
 
-Data (CSV + image folders)
+Data (CSV + image folders
+
 ↓
+
 NumPy loading (PIL, resize 224×224, uint8 0-255)
+
 ↓
+
 Stratified split 80% train / 20% validation
+
 ↓
+
 EfficientNet preprocessing (preprocess_input)
+
 ↓
+
 Model: EfficientNetB0 (frozen) + GlobalAvgPooling + BatchNorm + Dropout + Dense(73)
+
 ↓
-Phase 1: Train head only (Adam, lr=1e-3)
+
+Phase 1:Train head only (Adam, lr=1e-3)
+
 ↓
+
 Save best model (val_accuracy)
+
 ↓
+
 Predict on test → submission.csv
+
 
 ---
 
@@ -69,8 +84,7 @@ Predict on test → submission.csv
 |-----------|---------|----------|
 | **tf.data pipeline** | Model couldn't learn even on 1 batch (~3% accuracy) | Switched to **direct NumPy loading** with PIL — more reliable and easier to debug |
 | **Lambda layer** | Impossible to reload saved model (`NotImplementedError`) | Removed the `Lambda` layer; preprocessing done upstream on NumPy arrays |
-| **Kaggle GPU** | Local CPU too slow (hours per epoch) | Trained on **Kaggle GPU Tesla T4** — minutes per epoch |
-| **GitHub storage** | Files > 100 MB rejected (data, models) | Strict `.gitignore`: `data/`, `models/`, `*.keras` excluded |
+
 
 ---
 
@@ -82,7 +96,6 @@ Predict on test → submission.csv
 |--------|-------|--------|--------|
 | **Validation Accuracy** | **95.67%** | — | ✅ |
 | **Public Leaderboard** | **0.92998 (93.0%)** | ≥ 86% (min points) | ✅ |
-| **Public Leaderboard** | **0.92998 (93.0%)** | ≥ 92% (max points) | ✅ **70/70** |
 | Classes predicted | 73/73 | — | ✅ |
 
 ### Performance by Class
@@ -93,13 +106,13 @@ The model achieves an average **precision of 0.96** and **recall of 0.96** on va
 
 #### Training Curves
 
-![Training curves](results/training_curves.png)
+![Training curves](results/training_curve.png)
 
 *Validation accuracy rises quickly and stabilizes around 95% without significant overfitting (reasonable train/validation gap).*
 
 #### Confusion Matrix
 
-![Confusion Matrix](results/confusion_matrix.png)
+![Confusion Matrix](results/confusion_mat.png)
 
 *The dominant diagonal confirms the model correctly classifies most images. Errors concentrate on visually similar classes (e.g., figure skating men/women/pairs).*
 
@@ -110,8 +123,6 @@ The model achieves an average **precision of 0.96** and **recall of 0.96** on va
 1. **Transfer Learning > From Scratch** for small multi-class datasets.
 2. **NumPy > tf.data** when the data pipeline becomes a black box hard to debug.
 3. **Model-specific preprocessing** matters (EfficientNet expects `preprocess_input`, not just `/255`).
-4. **Kaggle GPU** is essential for fast iteration on computer vision models.
-5. **A good README with storytelling** communicates your work as well as the code does.
 
 ---
 
