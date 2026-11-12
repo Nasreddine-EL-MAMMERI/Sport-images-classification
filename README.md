@@ -23,7 +23,7 @@ Source : [Kaggle Competition — OpenCV TF Project 2](https://www.kaggle.com/com
 
 ## 🚀 Utilisation locale (structure uniquement)
 ```bash
-git clone https://github.com/Nasreddine-EL-MAMMERI/Image-Classifier.git
+git clone https://github.com/Nasreddine-EL-MAMMERI/Sport-images-classification.git
 cd Image-Classifier
 python -m venv .venv
 .\.venv\Scripts\activate      # Windows
