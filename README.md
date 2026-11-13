@@ -17,10 +17,6 @@ a custom classification head.
 | Trainable parameters | 349,769 / 4,402,412 |
 | Training time | ~6 min (20 epochs, Tesla T4) |
 
-> **Note on ranking.** The competition closed before this submission was made,
-> so it is marked *"Complete (after deadline)"* and does not appear in the
-> final standings. Both public and private scores are reported — no rank is
-> claimed.
 
 > **Note on naming.** The backbone is **frozen**: this is *feature extraction*,
 > not fine-tuning. A `unfreeze_for_fine_tuning()` function is provided in
