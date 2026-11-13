@@ -1,70 +1,93 @@
+"""Génération du fichier de soumission.
+
+Usage :
+    python -m src.predict
+
+Produit submission.csv avec les colonnes ID et CLASS, dans l'ordre de test.csv.
+
+"""
+
+import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import numpy as np
 import pandas as pd
 import tensorflow as tf
+from tensorflow.keras.applications.efficientnet import preprocess_input
 
 from config import Config
+from src.data import add_filepaths, load_images
 
 
-def find_image_path(image_id: str, root_dir: str) -> str:
-    """Cherche une image avec ou sans extension dans le dossier Test."""
-    candidates = [image_id]
-    for ext in [".jpg", ".jpeg", ".png"]:
-        candidates.append(image_id + ext)
-    for name in candidates:
-        path = os.path.join(root_dir, name)
-        if os.path.exists(path):
-            return path
-    raise FileNotFoundError(f"Image {image_id} introuvable dans {root_dir}")
+def main() -> None:
+    # ===== 1. Identifiants de test =====
+    test_df = pd.read_csv(Config.TEST_CSV)
+    expected_rows = len(test_df)
+    test_ids = test_df["ID"].astype(str).tolist()
 
-
-def main():
-    model = tf.keras.models.load_model("models/best_model.keras")
-
-    # Charger les IDs du test
-    test_df = pd.read_csv(str(Config.TEST_CSV))
-    image_ids = test_df['ID'].astype(str).tolist()
-    print(f"🖼️ Images à prédire : {len(image_ids)}")
-
-    # Récupérer les noms de classes (sauvegardés à l'entraînement ou depuis le dossier Train)
-    # ⚠️ À adapter : idéalement, sauvegarder class_names à l'entraînement dans un fichier JSON
-    import json
-    class_names_path = "models/class_names.json"
-    if os.path.exists(class_names_path):
-        with open(class_names_path) as f:
-            class_names = json.load(f)
-    else:
-        # Fallback : déduire depuis le dossier Train (si disponible en local)
-        train_ds = tf.keras.utils.image_dataset_from_directory(
-            str(Config.TRAIN_DIR),
-            image_size=Config.IMG_SIZE,
-            batch_size=1,
+    # ===== 2. Chargement =====
+    test_df = add_filepaths(test_df, Config.IMG_DIR)
+    if test_df["filepath"].isna().any():
+        missing = test_df.loc[test_df["filepath"].isna(), "ID"].tolist()[:5]
+        raise FileNotFoundError(
+            f"{int(test_df['filepath'].isna().sum())} images de test "
+            f"introuvables. Exemples : {missing}"
         )
-        class_names = train_ds.class_names
 
-    predictions = []
-    for image_id in image_ids:
-        path = find_image_path(image_id, str(Config.TEST_DIR))
-        img = tf.keras.utils.load_img(path, target_size=Config.IMG_SIZE)
-        arr = tf.keras.utils.img_to_array(img)
-        arr = tf.expand_dims(arr, axis=0)
+    X_test, _, _ = load_images(test_df, Config.IMG_SIZE, with_labels=False)
 
-        probs = model.predict(arr, verbose=0)[0]
-        predicted_class = class_names[int(tf.argmax(probs))]
-        predictions.append(predicted_class)
+    # ===== 3. Modèle et classes =====
+    model = tf.keras.models.load_model(str(Config.BEST_MODEL_PATH))
 
-    # Créer le submission
-    submission = pd.DataFrame({
-        "ID": image_ids,
-        "CLASS": predictions
-    })
-    submission.to_csv(str(Config.SUBMISSION_CSV), index=False)
+    if not Config.CLASS_NAMES_PATH.exists():
+        raise FileNotFoundError(
+            f"{Config.CLASS_NAMES_PATH} absent : lancez d'abord "
+            "`python -m src.train`, qui enregistre l'ordre des classes."
+        )
+    with open(Config.CLASS_NAMES_PATH, encoding="utf-8") as f:
+        class_names = json.load(f)
 
-    print(f"✅ {Config.SUBMISSION_CSV} créé avec {len(submission)} lignes")
+    n_outputs = model.output_shape[-1]
+    if n_outputs != len(class_names):
+        raise ValueError(
+            f"Le modèle prédit {n_outputs} classes, class_names.json en "
+            f"contient {len(class_names)}."
+        )
+
+    # ===== 4. Prédiction par lots =====
+    probs = model.predict(
+        preprocess_input(X_test.astype(np.float32)),
+        batch_size=Config.BATCH_SIZE,
+        verbose=0,
+    )
+    predictions = [class_names[int(i)] for i in np.argmax(probs, axis=1)]
+
+    # ===== 5. Contrôles avant écriture =====
+    assert len(predictions) == expected_rows, (
+        f"{len(predictions)} prédictions pour {expected_rows} lignes attendues"
+    )
+    assert set(predictions) <= set(class_names), "Label inconnu détecté"
+
+    submission = pd.DataFrame({"ID": test_ids, "CLASS": predictions})
+    submission.to_csv(Config.SUBMISSION_CSV, index=False)
+
+    print(f"✅ {Config.SUBMISSION_CSV} — {len(submission)} lignes")
     print(submission.head(10))
+
+    # ===== 6. Comparaison au sample_submission, si disponible =====
+    sample_path = Config.DATA_ROOT / "sample_submission.csv"
+    if sample_path.exists():
+        sample = pd.read_csv(sample_path)
+        same_columns = list(sample.columns) == list(submission.columns)
+        same_ids = sample["ID"].astype(str).tolist() == test_ids
+        print(f"\n🔎 Colonnes identiques au sample : {same_columns}")
+        print(f"🔎 Même ordre d'ID : {same_ids}")
+        if not (same_columns and same_ids):
+            print("⚠️ La soumission risque d'être rejetée par Kaggle.")
 
 
 if __name__ == "__main__":
