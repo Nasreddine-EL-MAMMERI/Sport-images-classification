@@ -154,10 +154,11 @@ def main() -> None:
 
     # Sauvegardé une fois : permet à src.compare_ft de tourner sans
     # recharger les 10 031 images (utile dans un notebook séparé).
-    np.save(Config.RESULTS_DIR / "y_val.npy", y_val)
-    (Config.RESULTS_DIR / "class_names.json").write_text(
-        json.dumps(data["class_names"], ensure_ascii=False), encoding="utf-8"
-    )
+    if not args.smoke:
+        np.save(Config.RESULTS_DIR / "y_val.npy", y_val)
+        (Config.RESULTS_DIR / "class_names.json").write_text(
+            json.dumps(data["class_names"], ensure_ascii=False), encoding="utf-8"
+        )
 
     if args.smoke:
         X_train, y_train = X_train[:640], y_train[:640]
@@ -180,14 +181,19 @@ def main() -> None:
         ds = make_dataset(X_val, y_val, Config.BATCH_SIZE, shuffle=False)
         return m.predict(ds, verbose=0)
 
+    tag = f"ft{args.unfreeze}" + ("_smoke" if args.smoke else "")
+
     # Référence mesurée une seule fois, puis mise en cache.
     ref_preds_path = Config.RESULTS_DIR / "preds_phase1.npy"
-    if ref_preds_path.exists():
+    # En mode smoke on ne met RIEN en cache : les prédictions portent sur
+    # 320 images et corrompraient la comparaison réelle (2 007 images).
+    if ref_preds_path.exists() and not args.smoke:
         ref_probs = np.load(ref_preds_path)
         print(f"♻️  Prédictions de référence rechargées : {ref_preds_path}")
     else:
         ref_probs = val_predictions(model)
-        np.save(ref_preds_path, ref_probs)
+        if not args.smoke:
+            np.save(ref_preds_path, ref_probs)
 
     ref_acc = float((ref_probs.argmax(1) == y_val.argmax(1)).mean())
     print(f"🎯 Exactitude de référence mesurée : {ref_acc:.4f}")
@@ -206,7 +212,6 @@ def main() -> None:
     )
 
     # ---- Callbacks : mêmes valeurs que la phase 1 ----
-    tag = f"ft{args.unfreeze}"
     ckpt_path = Config.MODELS_DIR / f"best_model_{tag}.keras"
     callbacks = [
         EarlyStopping(
