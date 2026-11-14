@@ -1,3 +1,4 @@
+# ===== Données et artefacts lourds =====
 data/
 !data/.gitkeep
 models/
@@ -5,17 +6,29 @@ models/
 *.h5
 *.keras
 *.weights.h5
-pycache/
-*.pyc
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
 .ipynb_checkpoints/
 .venv/
 venv/
+
+# ===== Éditeurs et systèmes =====
 .vscode/
 .DS_Store
+
+# ===== Secrets =====
 .env
 kaggle.json
-submission.csv
-.log
-results/.png
+.kaggle/
+
+# ===== Soumissions Kaggle =====
+submission*.csv
+
+# ===== Notebooks  =====
+*.ipynb
+
+# ===== Logs =====
+*.log
 Logs_Checkpoints/
-*.ipynb/
